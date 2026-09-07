@@ -1,0 +1,131 @@
+{
+    "pages": [
+        {
+            "path": "pages/index/index",
+            "style": {
+                "navigationBarTitleText": "Nest 安居",
+                "enablePullDownRefresh": true
+            }
+        },
+        {
+            "path": "pages/map/index",
+            "style": {
+                "navigationBarTitleText": "地图找房"
+            }
+        },
+        {
+            "path": "pages/ai/index",
+            "style": {
+                "navigationBarTitleText": "AI 小巢"
+            }
+        },
+        {
+            "path": "pages/chat/index",
+            "style": {
+                "navigationBarTitleText": "消息",
+                "enablePullDownRefresh": true
+            }
+        },
+        {
+            "path": "pages/my/index",
+            "style": {
+                "navigationBarTitleText": "我的"
+            }
+        },
+        {
+            "path": "pages/houseDetail/index",
+            "style": {
+                "navigationBarTitleText": "房源详情"
+            }
+        },
+        {
+            "path": "pages/chatDetail/index",
+            "style": {
+                "navigationBarTitleText": "聊天"
+            }
+        },
+        {
+            "path": "pages/favorite/index",
+            "style": {
+                "navigationBarTitleText": "我的收藏"
+            }
+        },
+        {
+            "path": "pages/appointment/index",
+            "style": {
+                "navigationBarTitleText": "我的预约"
+            }
+        },
+        {
+            "path": "pages/rent/index",
+            "style": {
+                "navigationBarTitleText": "租房订单",
+                "enablePullDownRefresh": true
+            }
+        },
+        {
+            "path": "pages/rentDetail/index",
+            "style": {
+                "navigationBarTitleText": "订单详情"
+            }
+        },
+        {
+            "path": "pages/wallet/index",
+            "style": {
+                "navigationBarTitleText": "我的钱包"
+            }
+        }
+    ],
+    "globalStyle": {
+        "navigationBarTextStyle": "black",
+        "navigationBarTitleText": "Nest 安居",
+        "navigationBarBackgroundColor": "#ffffff",
+        "backgroundColor": "#f5f7fa"
+    },
+    "permission": {
+        "scope.userLocation": {
+            "desc": "你的位置信息将用于显示附近的房源"
+        }
+    },
+    "requiredPrivateInfos": [
+        "getLocation"
+    ],
+    "tabBar": {
+        "color": "#999999",
+        "selectedColor": "#1a56db",
+        "backgroundColor": "#ffffff",
+        "borderStyle": "white",
+        "list": [
+            {
+                "pagePath": "pages/index/index",
+                "text": "首页",
+                "iconPath": "static/tabbar/home.png",
+                "selectedIconPath": "static/tabbar/home-active.png"
+            },
+            {
+                "pagePath": "pages/map/index",
+                "text": "地图",
+                "iconPath": "static/tabbar/map.png",
+                "selectedIconPath": "static/tabbar/map-active.png"
+            },
+            {
+                "pagePath": "pages/ai/index",
+                "text": "AI",
+                "iconPath": "static/tabbar/ai.png",
+                "selectedIconPath": "static/tabbar/ai-active.png"
+            },
+            {
+                "pagePath": "pages/chat/index",
+                "text": "消息",
+                "iconPath": "static/tabbar/chat.png",
+                "selectedIconPath": "static/tabbar/chat-active.png"
+            },
+            {
+                "pagePath": "pages/my/index",
+                "text": "我的",
+                "iconPath": "static/tabbar/mine.png",
+                "selectedIconPath": "static/tabbar/mine-active.png"
+            }
+        ]
+    }
+}

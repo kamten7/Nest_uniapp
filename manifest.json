@@ -1,0 +1,31 @@
+{
+    "name" : "nest-miniapp",
+    "appid" : "wxb26f1046c61b9ad2",
+    "description" : "Nest 安居租房平台 · 租客端小程序",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autostart" : true,
+            "autoclose" : true
+        }
+    },
+    "quickapp" : {},
+    "mp-weixin" : {
+        "appid" : "wxb26f1046c61b9ad2",
+        "setting" : {
+            "urlCheck" : false
+        },
+        "usingComponents" : true
+    },
+    "vueVersion" : "3",
+    "h5" : {
+        "title" : "Nest 安居"
+    }
+}
