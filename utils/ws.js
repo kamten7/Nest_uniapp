@@ -1,17 +1,18 @@
-import { baseUrl } from './env'
+import { wsBaseUrl } from './env'
 
 /**
  * WebSocket 封装 —— 连接聊天服务 + 自动重连 + 心跳。
  *
- * 连接地址：ws://host/ws/chat/{userType}/{userId}?token=xxx
+ * 连接地址：ws://host:8081/ws/chat/{userType}/{userId}?token=xxx
+ * —— 长连接由 Netty 独立端口（默认 8081）提供，与 HTTP 的 baseUrl 不同端口，
+ *    因此这里用 env.js 的 wsBaseUrl，**不能**再由 baseUrl 派生。
  * token 放 queryString（小程序 WebSocket 无法自定义 Header）。
  *
  * 断线自动重连：最多重试 5 次，每次间隔递增（3s、6s、9s...）。
- * 心跳：每 30 秒发一次，保活连接。
+ * 心跳：每 30 秒发一次，保活连接（服务端 reader-idle 为 60s，30s 安全）。
  */
 export function connectChat({ userType, userId, token, onMessage, onClose, onOpen, onTerminated }) {
-  const wsBase = baseUrl.replace(/^http/, 'ws')
-  const url = `${wsBase}/ws/chat/${userType}/${userId}?token=${token}`
+  const url = `${wsBaseUrl}/ws/chat/${userType}/${userId}?token=${token}`
 
   const state = {
     socket: null,
