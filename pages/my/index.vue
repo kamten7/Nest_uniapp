@@ -50,10 +50,7 @@
         <view class="login-title">Nest 安居</view>
         <view class="login-subtitle">登录后收藏房源、预约看房</view>
 
-        <input v-model="phone" class="login-input" placeholder="手机号" type="number" maxlength="11" />
-        <input v-model="password" class="login-input" placeholder="密码" password />
-        <view class="login-btn" @tap="doLogin">登 录</view>
-        <view class="register-btn" @tap="doRegister">没有账号？注册</view>
+        <view class="wx-login-btn" @tap="doWxLogin">微信一键登录</view>
       </view>
     </template>
   </view>
@@ -69,12 +66,6 @@ export default {
   setup() {
     return { userStore: useUserStore() }
   },
-  data() {
-    return {
-      phone: '',
-      password: ''
-    }
-  },
   computed: {
     avatarText() {
       const info = this.userStore.userInfo
@@ -86,45 +77,40 @@ export default {
     }
   },
   methods: {
-    async doLogin() {
-      if (!this.phone || !this.password) {
-        uni.showToast({ title: '请输入手机号和密码', icon: 'none' })
-        return
-      }
+    /**
+     * 微信一键登录：wx.login() 静默拿一次性 code → 后端调 jscode2session 换 openid
+     * → 已注册直接登录，未注册自动注册 → 返回 JWT。
+     * code 一次性，失败后需重新调 uni.login() 取新 code（这里每次点击都重新取，天然满足）。
+     */
+    doWxLogin() {
+      uni.login({
+        provider: 'weixin',
+        success: (res) => {
+          if (!res.code) {
+            uni.showToast({ title: '获取微信登录凭证失败', icon: 'none' })
+            return
+          }
+          this.loginWithCode(res.code)
+        },
+        fail: () => {
+          uni.showToast({ title: '微信登录未完成', icon: 'none' })
+        }
+      })
+    },
+    /** 用 code 调后端登录（后端负责换 openid / 自动注册 / 签发 JWT） */
+    async loginWithCode(code) {
       uni.showLoading({ title: '登录中...' })
       try {
-        const res = await post('/user/tenant/login', { phone: this.phone, password: this.password })
+        const res = await post('/user/tenant/login', { code })
         this.userStore.setLogin(res.data.token, res.data)
-        // 登录成功 → 建立全局聊天长连接 + 刷新消息角标
         ensureChatConnected()
         syncMessageBadge()
         uni.hideLoading()
         uni.showToast({ title: '登录成功', icon: 'success' })
-        this.phone = ''
-        this.password = ''
       } catch (e) {
         uni.hideLoading()
+        // 后端对 code 失效等场景返回的可读提示（如"登录已过期，请重新登录"）
         uni.showToast({ title: e.msg || '登录失败', icon: 'none' })
-      }
-    },
-    async doRegister() {
-      if (!this.phone || !this.password) {
-        uni.showToast({ title: '请输入手机号和密码', icon: 'none' })
-        return
-      }
-      uni.showLoading({ title: '注册中...' })
-      try {
-        const res = await post('/user/tenant/register', { phone: this.phone, password: this.password })
-        this.userStore.setLogin(res.data.token, res.data)
-        ensureChatConnected()
-        syncMessageBadge()
-        uni.hideLoading()
-        uni.showToast({ title: '注册成功', icon: 'success' })
-        this.phone = ''
-        this.password = ''
-      } catch (e) {
-        uni.hideLoading()
-        uni.showToast({ title: e.msg || '注册失败', icon: 'none' })
       }
     },
     logout() {
@@ -263,28 +249,12 @@ export default {
   margin: 12rpx 0 40rpx;
 }
 
-.login-input {
-  background: #f5f7fa;
-  border-radius: 12rpx;
-  padding: 22rpx 24rpx;
-  margin-bottom: 24rpx;
-  font-size: 28rpx;
-}
-
-.login-btn {
-  background: #1a56db;
+.wx-login-btn {
+  background: #07c160;
   color: #fff;
   text-align: center;
   border-radius: 30rpx;
   padding: 22rpx;
   font-size: 30rpx;
-  margin-top: 10rpx;
-}
-
-.register-btn {
-  text-align: center;
-  color: #1a56db;
-  font-size: 26rpx;
-  margin-top: 24rpx;
 }
 </style>
