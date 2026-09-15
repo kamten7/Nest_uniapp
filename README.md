@@ -203,10 +203,25 @@ HTTP 接口与 WebSocket 长连接由后端的不同服务提供，**端口不�
 
 | 配置项 | 文件 | 说明 |
 |--------|------|------|
-| 小程序 AppID | `manifest.json` → `mp-weixin.appid` | 填入自有小程序 AppID |
+| 小程序 AppID | `project.config.json` → `appid` | **本地文件，不进仓库**（见下方「本地配置」） |
 | Vue 版本 | `manifest.json` → `vueVersion` | 固定为 `"3"` |
 | 路由 / TabBar / 权限 | `pages.json` | 页面注册、导航栏、位置权限声明 |
 | 编译配置 | `vite.config.js` | 源码根目录不在 `src/`，通过 `UNI_INPUT_DIR` 覆盖为项目根目录 |
+
+#### 本地配置：AppID 不进仓库
+
+`project.config.json` 含个人小程序 AppID，**已被 `.gitignore` 忽略**，仓库只提交模板 `project.config.json.example`。首次拉取代码后：
+
+```bash
+cp project.config.json.example project.config.json
+```
+
+再把其中的 `appid` 改成你自己的小程序 AppID 即可。
+
+- 编译时 appid **取自 `project.config.json`**，会写入产物 `dist/*/mp-weixin/project.config.json`（产物目录不进仓库，也不会泄露）。
+- `manifest.json` 的 `mp-weixin.appid` 保持留空 —— 它不参与产物生成。
+- 若 `appid` 为空，产物会退化为微信的 `touristappid`（游客模式），仍可编译运行，但无法真机调试与上传。
+
 
 ### 5.3 与后端的接口约定
 

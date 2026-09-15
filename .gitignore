@@ -29,6 +29,10 @@ npm-debug.log*
 # WeChat mini program private config
 project.private.config.json
 
+# 本地 project.config.json（含真实 appid）——只提交 project.config.json.example 模板
+# uni 编译时 appid 取自这个文件，所以它必须留在本地、不进仓库
+project.config.json
+
 # OpenCode workspace
 .codegraph/
 .omo/

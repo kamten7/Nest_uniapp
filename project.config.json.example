@@ -1,4 +1,5 @@
 {
+  // 项目配置文件
   "setting": {
     "es6": true,
     "postcss": true,
@@ -20,6 +21,6 @@
     "ignore": [],
     "include": []
   },
-  "appid": "wxb26f1046c61b9ad2",
+  "appid": "",
   "editorSetting": {}
 }
