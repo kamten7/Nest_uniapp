@@ -20,7 +20,11 @@
         </view>
         <view class="appt-footer">
           <text class="appt-landlord">房东：{{ item.landlordName }}</text>
-          <text v-if="item.status === 1 || item.status === 2" class="cancel-btn" @tap="cancelAppointment(item)">取消预约</text>
+          <view class="appt-actions">
+            <text v-if="item.status === 1 || item.status === 2" class="cancel-btn" @tap="cancelAppointment(item)">取消预约</text>
+            <!-- 已看房 → 租客决定租下，生成租房订单（后端要求预约处于「已看房」且已绑定手机号） -->
+            <text v-if="item.status === 3" class="rent-btn" @tap="onConfirmRent(item)">确认租房</text>
+          </view>
         </view>
       </view>
 
@@ -37,6 +41,7 @@
 
 <script>
 import { get, put } from '@/utils/request'
+import { confirmRent } from '@/api/rent'
 
 // 状态文本（与后端 AppointmentStatus 一致）
 const STATUS_TEXT = {
@@ -50,10 +55,14 @@ export default {
       page: 1,
       pageSize: 10,
       total: 0,
-      hasMore: true
+      hasMore: true,
+      submitting: false
     }
   },
   onShow() {
+    // 防御：若上一次请求在页面失焦/被销毁途中没走完 finally，
+    // 防连点标记会一直停在 true，之后每次点「确认租房」都会被静默拦掉（表现为按钮无响应）。
+    this.submitting = false
     this.load(true)
   },
   onReachBottom() {
@@ -99,6 +108,50 @@ export default {
             } catch (e) {
               uni.showToast({ title: e.msg || '取消失败', icon: 'none' })
             }
+          }
+        }
+      })
+    },
+    /**
+     * 已看房 → 确认租房：调用 /user/rent/confirm 生成租房订单，成功后进订单详情缴押金。
+     * 后端前置条件：预约状态必须为「已看房」、租客必须已绑定手机号
+     * （未绑手机号时会返回「请先绑定手机号后再租房（我的 → 个人信息）」，这里原样提示）。
+     */
+    onConfirmRent(item) {
+      uni.showModal({
+        title: '确认租房',
+        content: `确认租下「${item.houseTitle}」？将生成租房订单，随后需缴纳押金。`,
+        success: async (res) => {
+          if (!res.confirm) return
+          // 不能静默 return：静默会被当成「按钮坏了」，一定要给用户一句反馈
+          if (this.submitting) {
+            uni.showToast({ title: '正在处理，请稍候…', icon: 'none' })
+            return
+          }
+          this.submitting = true
+          uni.showLoading({ title: '生成订单中...' })
+          try {
+            const r = await confirmRent(item.id)
+            const orderId = r.data && r.data.id
+            uni.hideLoading()
+            setTimeout(() => {
+              uni.showToast({ title: '已生成租房订单', icon: 'success', duration: 800 })
+              setTimeout(() => {
+                const url = orderId
+                  ? `/pages/rentDetail/index?orderId=${orderId}`
+                  : '/pages/rent/index'
+                // 页面栈满（小程序上限 10 层）时 navigateTo 会失败且毫无提示，
+                // 这里降级成 redirectTo，保证一定有跳转。
+                uni.navigateTo({ url, fail: () => uni.redirectTo({ url }) })
+              }, 800)
+            }, 100)
+          } catch (e) {
+            uni.hideLoading()
+            // showLoading 与 showToast 共用同一浮层，紧接着调用有概率被吞掉 ⇒ 用户看不到任何提示。
+            // 延迟一帧再弹，失败原因一定能看到。
+            setTimeout(() => uni.showToast({ title: e.msg || '确认租房失败', icon: 'none' }), 100)
+          } finally {
+            this.submitting = false
           }
         }
       })
@@ -188,6 +241,21 @@ export default {
   border: 1rpx solid #e74c3c;
   border-radius: 30rpx;
   padding: 6rpx 24rpx;
+}
+
+.appt-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* 不用 gap：小程序部分基础库不支持 flex gap */
+.rent-btn {
+  font-size: 26rpx;
+  color: #fff;
+  background: #1a56db;
+  border-radius: 30rpx;
+  padding: 8rpx 28rpx;
+  margin-left: 16rpx;
 }
 
 .load-more {

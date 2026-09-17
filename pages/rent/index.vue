@@ -67,7 +67,9 @@ export default {
       page: 1,
       pageSize: 10,
       total: 0,
-      hasMore: true
+      hasMore: true,
+      /** 防连点：缴费请求进行中时忽略后续点击 */
+      submitting: false
     }
   },
   onShow() {
@@ -106,12 +108,16 @@ export default {
         content: `确认缴纳押金 ${this.money(item.deposit)} 元？将使用钱包余额支付`,
         success: async (res) => {
           if (!res.confirm) return
+          if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+          this.submitting = true
           try {
             await payDeposit(item.id)
             uni.showToast({ title: '押金已缴纳', icon: 'success' })
             this.loadList(true)
           } catch (e) {
             uni.showToast({ title: e.msg || '缴纳失败', icon: 'none' })
+          } finally {
+            this.submitting = false
           }
         }
       })

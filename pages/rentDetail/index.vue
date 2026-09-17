@@ -43,6 +43,7 @@
       <!-- 待缴押金 -->
       <template v-if="order.status === 1">
         <view class="action-btn primary" @tap="payDeposit">缴纳押金 {{ money(order.deposit) }}元</view>
+        <view class="action-btn danger" @tap="onCancelOrder">放弃租房</view>
       </template>
 
       <!-- 租房中 -->
@@ -59,7 +60,7 @@
 </template>
 
 <script>
-import { getRentDetail, payDeposit, payRent, payAhead, terminateRent } from '@/api/rent'
+import { getRentDetail, payDeposit, payRent, payAhead, terminateRent, cancelOrder } from '@/api/rent'
 
 const STATUS_TEXT = { 1: '待缴押金', 2: '租房中', 3: '退租申请中', 4: '已退租', 5: '已取消' }
 
@@ -67,7 +68,9 @@ export default {
   data() {
     return {
       orderId: null,
-      order: null
+      order: null,
+      /** 防连点：缴押金/缴租/提前支付/退租请求进行中时忽略后续点击 */
+      submitting: false
     }
   },
   onLoad(query) {
@@ -91,12 +94,16 @@ export default {
         content: `确认使用钱包余额缴纳押金 ${this.money(this.order.deposit)} 元？`,
         success: async (res) => {
           if (!res.confirm) return
+          if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+          this.submitting = true
           try {
             await payDeposit(this.order.id)
             uni.showToast({ title: '押金已缴纳', icon: 'success' })
             this.load()
           } catch (e) {
             uni.showToast({ title: e.msg || '缴纳失败', icon: 'none' })
+          } finally {
+            this.submitting = false
           }
         }
       })
@@ -107,12 +114,19 @@ export default {
         content: `确认缴纳下期（${this.order.nextDuePeriod}）租金 ${this.money(this.order.monthlyRent)} 元？`,
         success: async (res) => {
           if (!res.confirm) return
+          if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+          this.submitting = true
           try {
-            await payRent(this.order.id)
+            // 必须把弹窗里展示的那个周期一并传上去：
+            // 不传时服务端会取「当前待缴周期」，于是第二次点击会合法地缴掉下一个月（重复扣款）。
+            // 传了之后，重复请求会因周期已被推进而被服务端拒绝。
+            await payRent(this.order.id, this.order.nextDuePeriod)
             uni.showToast({ title: '缴纳成功', icon: 'success' })
             this.load()
           } catch (e) {
             uni.showToast({ title: e.msg || '缴纳失败', icon: 'none' })
+          } finally {
+            this.submitting = false
           }
         }
       })
@@ -135,12 +149,16 @@ export default {
             content: `将支付 ${months} 个月，共 ${this.money(total)} 元`,
             success: async (r) => {
               if (!r.confirm) return
+              if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+              this.submitting = true
               try {
                 await payAhead(this.order.id, months)
                 uni.showToast({ title: '支付成功', icon: 'success' })
                 this.load()
               } catch (e) {
                 uni.showToast({ title: e.msg || '支付失败', icon: 'none' })
+              } finally {
+                this.submitting = false
               }
             }
           })
@@ -154,12 +172,41 @@ export default {
         placeholderText: '退租原因（可选）',
         success: async (res) => {
           if (!res.confirm) return
+          if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+          this.submitting = true
           try {
             await terminateRent(this.order.id, res.content || '')
             uni.showToast({ title: '退租申请已提交', icon: 'success' })
             this.load()
           } catch (e) {
             uni.showToast({ title: e.msg || '操作失败', icon: 'none' })
+          } finally {
+            this.submitting = false
+          }
+        }
+      })
+    },
+    /**
+     * 放弃租房（仅「待缴押金」状态）。
+     * ⚠️ 方法名不要叫 cancelOrder —— 会和顶部从 @/api/rent 导入的 cancelOrder 同名，
+     * 虽然当前构建产物能正确解析成 api_rent.cancelOrder，但这种遮蔽随时可能踩坑。
+     */
+    onCancelOrder() {
+      uni.showModal({
+        title: '放弃租房',
+        content: '确认放弃本次租房？房源将恢复上架，其他租客可继续预约。',
+        success: async (res) => {
+          if (!res.confirm) return
+          if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+          this.submitting = true
+          try {
+            await cancelOrder(this.order.id)
+            uni.showToast({ title: '已放弃租房', icon: 'success' })
+            setTimeout(() => uni.navigateBack(), 1000)
+          } catch (e) {
+            uni.showToast({ title: e.msg || '操作失败', icon: 'none' })
+          } finally {
+            this.submitting = false
           }
         }
       })

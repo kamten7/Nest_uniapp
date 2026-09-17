@@ -34,3 +34,8 @@ export function payAhead(orderId, months) {
 export function terminateRent(orderId, remark) {
   return post(`/user/rent/${orderId}/terminate`, { remark })
 }
+
+/** 放弃租房（仅待缴押金状态可取消，会恢复房源为上架） */
+export function cancelOrder(orderId) {
+  return post(`/user/rent/${orderId}/cancel`)
+}

@@ -78,7 +78,9 @@ export default {
       page: 1,
       pageSize: 10,
       total: 0,
-      hasMore: true
+      hasMore: true,
+      /** 防连点：充值/提现请求进行中时忽略后续点击（否则连点会重复提交） */
+      submitting: false
     }
   },
   computed: {
@@ -120,11 +122,13 @@ export default {
       }
     },
     async doRecharge() {
+      if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
       const amount = Number(this.rechargeAmount)
       if (!amount || amount <= 0) {
         uni.showToast({ title: '请输入正确金额', icon: 'none' })
         return
       }
+      this.submitting = true
       try {
         const res = await recharge(amount)
         this.balance = Number((res.data && res.data.balance) || 0)
@@ -132,6 +136,8 @@ export default {
         this.loadTxns(true)
       } catch (e) {
         uni.showToast({ title: e.msg || '充值失败', icon: 'none' })
+      } finally {
+        this.submitting = false
       }
     },
     doWithdraw() {
@@ -143,6 +149,7 @@ export default {
       this.showWithdrawPanel = false
     },
     async doWithdrawConfirm() {
+      if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
       const amount = Number(this.withdrawAmount)
       if (!amount || amount <= 0) {
         uni.showToast({ title: '请输入正确金额', icon: 'none' })
@@ -153,6 +160,8 @@ export default {
         content: `提现金额 ${this.money(amount)} 元`,
         success: async (res) => {
           if (!res.confirm) return
+          if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
+          this.submitting = true
           try {
             const r = await withdraw(amount)
             this.balance = Number((r.data && r.data.balance) || 0)
@@ -162,6 +171,8 @@ export default {
             this.loadTxns(true)
           } catch (e) {
             uni.showToast({ title: e.msg || '提现失败', icon: 'none' })
+          } finally {
+            this.submitting = false
           }
         }
       })
