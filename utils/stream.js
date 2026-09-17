@@ -17,6 +17,7 @@
  */
 import { baseUrl } from './env'
 import { useUserStore } from '@/store/user'
+import { closeChat } from '@/utils/chatClient'
 
 export function streamRequest({ url, data = {}, onMessage, onDone, onError }) {
   const store = useUserStore()
@@ -35,11 +36,22 @@ export function streamRequest({ url, data = {}, onMessage, onDone, onError }) {
       'authentication': token || ''
     },
     success: (res) => {
-      // 流正常结束但没收到 [DONE]（可能是服务器提前关闭连接）
-      if (!finished && res.statusCode === 200) {
-        finished = true
+      if (finished) return
+      finished = true
+      // 200 但没收到 [DONE]：服务器提前关闭了连接，也按正常结束收尾
+      if (res.statusCode === 200) {
         onDone && onDone()
+        return
       }
+      // 非 200（token 失效 401 / 500 等）根本不会有 SSE 帧，必须在这里收尾。
+      // 否则 onDone / onError 都不触发，调用方的 streaming 会永远停在 true，
+      // 发送按钮和清空按钮就都点不动了。
+      if (res.statusCode === 401) {
+        // 与 utils/request.js 的 401 处置保持一致：清登录态 + 断开聊天长连接
+        store.logout()
+        closeChat()
+      }
+      onError && onError(res.statusCode === 401 ? '登录已过期，请重新登录' : `请求失败（${res.statusCode}）`)
     },
     fail: (err) => {
       if (!finished) {

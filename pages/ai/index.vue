@@ -119,6 +119,7 @@ export default {
     if (userId === this.loadedUserId) return
     this.loadedUserId = userId
     this.messages = []
+    this.inputText = ''   // 换账号/退出登录时把未发送的草稿一并清掉
     this.atBottom = true
     if (userId) this.loadHistory()
   },
@@ -234,16 +235,21 @@ export default {
       // 逐字输出时消息条数不变、但内容一直在变高，所以必须每次都重新定位到底部锚点
       this.scrollToBottom()
     },
-    /** 流式结束 */
+    /** 流式结束（errorMsg 为空表示正常结束） */
     finishAI(errorMsg) {
       this.streaming = false
       if (errorMsg) {
         const last = this.messages[this.messages.length - 1]
-        if (!last || last.role !== 'ai') {
+        if (last && last.role === 'ai') {
+          // 已经吐了一部分才中断：接在同一个气泡后面，
+          // 否则用户会把那半句话当成完整回复
+          last.content += `\n\n（回复中断：${errorMsg}）`
+        } else {
           this.messages.push({ role: 'ai', content: errorMsg })
         }
       }
-      this.scrollToBottom()
+      // 出错时强制滚到底（要让用户看见中断提示）；正常结束则不打断正在上翻历史的人
+      this.scrollToBottom(!!errorMsg)
     }
   }
 }
