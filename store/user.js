@@ -26,6 +26,14 @@ export const useUserStore = defineStore('user', {
       this.userInfo = {}
       uni.removeStorageSync('token')
       uni.removeStorageSync('userInfo')
+    },
+    /**
+     * 局部更新本地缓存的用户信息（改资料 / 换头像后用）。
+     * 用合并而不是整体替换，避免后端只返回部分字段时把其余字段抹掉。
+     */
+    updateUserInfo(partial) {
+      this.userInfo = { ...this.userInfo, ...(partial || {}) }
+      uni.setStorageSync('userInfo', this.userInfo)
     }
   }
 })

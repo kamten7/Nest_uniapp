@@ -4,11 +4,13 @@
     <message-toast />
     <!-- 已登录：用户信息卡 + 菜单 -->
     <template v-if="userStore.isLogin">
-      <view class="user-card">
-        <view class="avatar">{{ avatarText }}</view>
+      <view class="user-card" @tap="go('/pages/profile/index')">
+        <image v-if="userStore.userInfo.avatar" class="avatar avatar-img" :src="userStore.userInfo.avatar" mode="aspectFill" />
+        <view v-else class="avatar">{{ avatarText }}</view>
         <view class="user-info">
           <view class="nickname">{{ nicknameText }}</view>
           <view class="phone" v-if="userStore.userInfo.phone">{{ userStore.userInfo.phone }}</view>
+          <view class="phone hint" v-else>未绑定手机号，绑定后才能租房 ›</view>
         </view>
       </view>
 
@@ -179,6 +181,17 @@ export default {
   font-size: 26rpx;
   opacity: 0.8;
   margin-top: 8rpx;
+}
+
+/* 未绑定手机号：高亮提示（绑定后才能确认租房） */
+.phone.hint {
+  opacity: 1;
+  color: #ffe9b8;
+}
+
+/* 真实头像图片：复用 .avatar 的尺寸与圆形 */
+.avatar-img {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .menu-group {

@@ -33,6 +33,12 @@
             }
         },
         {
+            "path": "pages/profile/index",
+            "style": {
+                "navigationBarTitleText": "个人信息"
+            }
+        },
+        {
             "path": "pages/houseDetail/index",
             "style": {
                 "navigationBarTitleText": "房源详情"
