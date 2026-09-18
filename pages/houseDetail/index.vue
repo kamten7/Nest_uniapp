@@ -9,6 +9,11 @@
   </view>
 
   <view class="detail-page" v-if="house">
+    <!-- 非「上架」房源：只有曾租住过的租客能看到（退租后回来看评论/追评） -->
+    <view v-if="house.status !== 1" class="house-banner">
+      <text>{{ house.status === 2 ? '该房源正在出租中，你曾租住过，可继续查看与追评' : '该房源已下架，仅曾租住的你可以查看与追评' }}</text>
+    </view>
+
     <!-- 图片轮播 -->
     <swiper v-if="house.images && house.images.length" class="image-swiper" indicator-dots autoplay circular>
       <swiper-item v-for="(img, idx) in house.images" :key="idx">
@@ -70,17 +75,18 @@
       </view>
     </view>
 
-    <!-- 住客评价 -->
+    <!-- 住客评价 / 房源讨论 -->
     <view class="section">
       <view class="section-title">
         住客评价
-        <text v-if="reviews.avgRating" class="avg-rating">⭐ {{ reviews.avgRating }}</text>
-        <text v-if="reviews.totalCount" class="review-count">（{{ reviews.totalCount }}条）</text>
+        <text v-if="reviews.ratedCount" class="avg-rating">⭐ {{ reviews.avgRating }}</text>
+        <text v-if="reviews.ratedCount" class="review-count">{{ reviews.ratedCount }}人评分</text>
+        <text class="review-count">共{{ reviews.totalCount }}条</text>
       </view>
 
-      <!-- 发表评论 -->
+      <!-- 发表评论（可不打分，看房用户也能发） -->
       <view class="add-review" @tap="showAddReview">
-        <text>✏️ 发表评价</text>
+        <text>✏️ 发表评论 / 提问</text>
       </view>
 
       <!-- 评论列表 -->
@@ -88,22 +94,43 @@
         <view v-for="r in reviewList" :key="r.id" class="review-item">
           <view class="review-header">
             <text class="review-name">{{ r.tenantName }}</text>
-            <text class="review-stars">{{ '★'.repeat(r.rating) }}<text class="stars-empty">{{ '★'.repeat(5 - r.rating) }}</text></text>
+            <text v-if="r.rating" class="review-stars">{{ '★'.repeat(r.rating) }}<text class="stars-empty">{{ '★'.repeat(5 - r.rating) }}</text></text>
+            <text v-else class="review-tag">评论</text>
           </view>
           <view class="review-content">{{ r.content }}</view>
-          <view class="review-time">{{ formatTime(r.createTime) }}</view>
-
-          <!-- 回复列表 -->
-          <view v-if="r.comments && r.comments.length" class="comment-list">
-            <view v-for="c in r.comments" :key="c.id" class="comment-item">
-              <text class="comment-name">{{ c.userName }}：</text>
-              <text class="comment-content">{{ c.content }}</text>
-              <text class="comment-like" @tap="toggleLike(c)">♥ {{ c.likeCount }}</text>
+          <view class="review-foot">
+            <text class="review-time">{{ formatTime(r.createTime) }}</text>
+            <view class="foot-ops">
+              <text v-if="r.mine" class="op-del" @tap="onDeleteReview(r)">删除</text>
+              <text class="review-like" :class="{ liked: r.liked }" @tap="toggleLikeReview(r)">♥ {{ r.likeCount || 0 }}</text>
             </view>
           </view>
 
-          <!-- 回复按钮 -->
-          <view class="reply-btn" @tap="showAddComment(r)">回复</view>
+          <!-- 回复列表（「A 回复 B：内容」） -->
+          <view v-if="r.comments && r.comments.length" class="comment-list">
+            <view v-for="c in r.comments" :key="c.id" class="comment-item">
+              <view class="comment-body">
+                <text class="comment-name">{{ c.userName }}</text>
+                <text v-if="c.parentUserName" class="comment-reply-to">回复 {{ c.parentUserName }}</text>
+                <text class="comment-content">：{{ c.content }}</text>
+              </view>
+              <view class="comment-ops">
+                <text v-if="c.mine" class="comment-op op-del" @tap="onDeleteComment(c)">删除</text>
+                <text class="comment-op" @tap="replyToComment(r, c)">回复</text>
+                <text class="comment-like" :class="{ liked: c.liked }" @tap="toggleLike(c)">♥ {{ c.likeCount || 0 }}</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 参与讨论 / 在下面提问 -->
+          <view class="reply-btn" @tap="replyToReview(r)">
+            <text>{{ r.comments && r.comments.length ? '参与讨论' : '回复 / 提问' }}</text>
+          </view>
+        </view>
+
+        <!-- 加载更多 -->
+        <view v-if="hasMore" class="load-more" @tap="loadMore">
+          <text>{{ loadingMore ? '加载中…' : '加载更多评论' }}</text>
         </view>
       </view>
 
@@ -123,10 +150,10 @@
       <view class="appoint-btn" @tap="showAppointment">预约看房</view>
     </view>
 
-    <!-- 发表评价弹窗（星级选择） -->
+    <!-- 发表评论弹窗（星级可选：不点星即为纯评论/提问） -->
     <view v-if="showReviewPopup" class="popup-mask" @tap="showReviewPopup = false">
       <view class="popup-card" @tap.stop>
-        <view class="popup-title">发表评价</view>
+        <view class="popup-title">{{ reviewMode === 'review' ? '评价这次租房' : '发表评论' }}</view>
         <view class="star-row">
           <text
             v-for="n in 5"
@@ -135,10 +162,18 @@
             :class="{ active: n <= reviewRating }"
             @tap="reviewRating = n"
           >★</text>
-          <text class="star-hint">{{ reviewRating }} 星</text>
+          <text class="star-hint">{{ reviewRating ? reviewRating + ' 星' : '未打分' }}</text>
         </view>
-        <textarea v-model="reviewContent" class="popup-input" placeholder="说说你的入住体验..." :maxlength="200" />
-        <view class="popup-btn" @tap="submitReview">提交评价</view>
+        <view class="star-clear" @tap="reviewRating = 0">
+          <text>{{ reviewRating ? '不打分，只发评论' : '✓ 已选择：不打分' }}</text>
+        </view>
+        <textarea
+          v-model="reviewContent"
+          class="popup-input"
+          :placeholder="reviewMode === 'review' ? '说说你的入住体验...' : '想问点什么？或者说说你的看法...'"
+          :maxlength="500"
+        />
+        <view class="popup-btn" @tap="submitReview">提交</view>
       </view>
     </view>
 
@@ -159,7 +194,7 @@
 
 <script>
 import { get, post, del, put } from '@/utils/request'
-import { getHouseReviews, addReview, addComment, likeComment } from '@/api/review'
+import { getHouseReviews, addReview, addComment, likeReview, likeComment, deleteReview, deleteComment } from '@/api/review'
 import { createConversation } from '@/api/chat'
 import { useUserStore } from '@/store/user'
 
@@ -174,11 +209,17 @@ export default {
       loadError: false,        // 加载失败标记（避免页面空白，显示失败提示）
       isFavorite: false,
       reviewList: [],        // 评论列表
-      reviews: { avgRating: 0, totalCount: 0 },   // 平均分+总数
+      reviews: { avgRating: 0, totalCount: 0, ratedCount: 0 },   // 平均分+总数+评分人数
+      reviewPage: 1,           // 评论分页页码
+      reviewPageSize: 10,      // 每页条数
+      hasMore: false,          // 是否还有更多评论
+      loadingMore: false,      // 加载更多中
       // 评价弹窗
       showReviewPopup: false,
-      reviewRating: 5,
+      reviewMode: 'comment',   // comment=纯评论 / review=带星评价
+      reviewRating: 0,         // 0 = 不打分
       reviewContent: '',
+      reviewSubmitting: false,
       // 预约弹窗
       showAppointmentPopup: false,
       appointmentDate: '',
@@ -197,87 +238,192 @@ export default {
     goBack() {
       uni.navigateBack()
     },
-    /** 加载房源评论 */
-    async loadReviews() {
+    /** 加载房源评论（reset=true 时回到第一页） */
+    async loadReviews(reset = true) {
+      if (reset) {
+        this.reviewPage = 1
+        this.reviewList = []
+      }
       try {
-        const res = await getHouseReviews(this.houseId)
-        const data = res.data || { records: [], avgRating: 0, totalCount: 0 }
-        this.reviewList = data.records || []
-        if (this.reviewList.length) {
-          this.reviews.avgRating = this.reviewList[0].avgRating
-          this.reviews.totalCount = this.reviewList[0].totalCount
+        const res = await getHouseReviews(this.houseId, this.reviewPage, this.reviewPageSize)
+        const data = res.data || { records: [], total: 0 }
+        const list = data.records || []
+        this.reviewList = reset ? list : this.reviewList.concat(list)
+        this.hasMore = this.reviewList.length < Number(data.total || 0)
+        if (list.length) {
+          this.reviews.ratedCount = list[0].ratedCount || 0
+          this.reviews.avgRating = list[0].avgRating || 0
+          this.reviews.totalCount = list[0].totalCount || 0
+        } else if (reset) {
+          this.reviews = { avgRating: 0, totalCount: 0, ratedCount: 0 }
         }
       } catch (e) {
         console.log('评论加载失败', e)
       }
     },
-    /** 弹窗发表评论 */
-    /** 打开评价弹窗 */
-    showAddReview() {
+    /** 加载更多评论 */
+    async loadMore() {
+      if (this.loadingMore || !this.hasMore) return
+      this.loadingMore = true
+      this.reviewPage += 1
+      await this.loadReviews(false)
+      this.loadingMore = false
+    },
+    /** 打开评论弹窗（mode=review 时默认 5 星，mode=comment 时默认不打分） */
+    openReviewPopup(mode = 'comment') {
       if (!this.userStore.isLogin) {
         uni.showToast({ title: '请先登录', icon: 'none' })
-        return
+        return false
       }
-      this.reviewRating = 5
+      this.reviewMode = mode
+      this.reviewRating = mode === 'review' ? 5 : 0
       this.reviewContent = ''
       this.showReviewPopup = true
+      return true
     },
-    /** 提交评价 */
+    /** 打开评论弹窗（房源页入口：默认不打分，看房用户也能发） */
+    showAddReview() {
+      this.openReviewPopup('comment')
+    },
+    /** 提交评价/评论 */
     async submitReview() {
       if (!this.reviewContent.trim()) {
-        uni.showToast({ title: '请输入评价内容', icon: 'none' })
+        uni.showToast({ title: '请输入内容', icon: 'none' })
         return
       }
+      if (this.reviewSubmitting) return
+      this.reviewSubmitting = true
       try {
-        await addReview({ houseId: Number(this.houseId), rating: this.reviewRating, content: this.reviewContent })
-        uni.showToast({ title: '评价成功', icon: 'success' })
+        await addReview({
+          houseId: Number(this.houseId),
+          rating: this.reviewRating > 0 ? this.reviewRating : null,
+          content: this.reviewContent.trim()
+        })
         this.showReviewPopup = false
         this.loadReviews()
+        // showLoading/toast 共用一层遮罩，延后一点再弹，避免被吞
+        setTimeout(() => uni.showToast({ title: '发布成功', icon: 'success' }), 100)
       } catch (e) {
-        uni.showToast({ title: e.msg || '评价失败', icon: 'none' })
+        uni.showToast({ title: e.msg || '发布失败', icon: 'none' })
+      } finally {
+        this.reviewSubmitting = false
       }
     },
-    /** 弹窗回复评论 */
-    showAddComment(review) {
+    /** 回复评价本身（一级回复） */
+    replyToReview(review) {
+      this.openReplyModal(review, null, '回复评价')
+    },
+    /** 在某条回复下追问（parentId 指向该回复，支持「在别人评论下问问题」） */
+    replyToComment(review, comment) {
+      this.openReplyModal(review, comment, `回复 ${comment.userName}`)
+    },
+    /** 统一的回复弹窗 */
+    openReplyModal(review, comment, title) {
       if (!this.userStore.isLogin) {
         uni.showToast({ title: '请先登录', icon: 'none' })
         return
       }
       uni.showModal({
-        title: '回复评价',
+        title,
         editable: true,
-        placeholderText: '输入回复内容',
+        placeholderText: comment ? `回复 ${comment.userName}…` : '输入回复内容',
         success: async (res) => {
-          if (res.confirm && res.content) {
-            try {
-              await addComment(review.id, { content: res.content })
-              uni.showToast({ title: '回复成功', icon: 'success' })
-              this.loadReviews()
-            } catch (e) {
-              uni.showToast({ title: e.msg || '回复失败', icon: 'none' })
-            }
+          if (!res.confirm || !res.content || !res.content.trim()) return
+          try {
+            await addComment(review.id, {
+              content: res.content.trim(),
+              parentId: comment ? comment.id : null
+            })
+            this.loadReviews()
+            setTimeout(() => uni.showToast({ title: '回复成功', icon: 'success' }), 100)
+          } catch (e) {
+            uni.showToast({ title: e.msg || '回复失败', icon: 'none' })
           }
         }
       })
     },
-    /** 点赞/取消赞 */
+    /** 点赞/取消赞（顶楼评价） */
+    async toggleLikeReview(review) {
+      if (!this.userStore.isLogin) {
+        uni.showToast({ title: '请先登录', icon: 'none' })
+        return
+      }
+      if (review.liking) return
+      review.liking = true
+      const liked = !review.liked
+      try {
+        await likeReview(review.id, liked)
+        review.liked = liked
+        review.likeCount = Math.max(0, (review.likeCount || 0) + (liked ? 1 : -1))
+      } catch (e) {
+        uni.showToast({ title: e.msg || '操作失败', icon: 'none' })
+      } finally {
+        review.liking = false
+      }
+    },
+    /** 点赞/取消赞（楼中回复） */
     async toggleLike(comment) {
       if (!this.userStore.isLogin) {
         uni.showToast({ title: '请先登录', icon: 'none' })
         return
       }
+      if (comment.liking) return
+      comment.liking = true
+      const liked = !comment.liked
       try {
-        const liked = !comment.liked
         await likeComment(comment.id, liked)
         comment.liked = liked
         comment.likeCount = Math.max(0, (comment.likeCount || 0) + (liked ? 1 : -1))
       } catch (e) {
         uni.showToast({ title: e.msg || '操作失败', icon: 'none' })
+      } finally {
+        comment.liking = false
       }
     },
     formatTime(t) {
       if (!t) return ''
       return t.replace('T', ' ').slice(0, 10)
+    },
+    /** 删除本人发的评价（只能删自己的，其下回复会一并消失） */
+    onDeleteReview(review) {
+      const count = (review.comments && review.comments.length) || 0
+      uni.showModal({
+        title: '删除评价',
+        content: count
+          ? `删除后这条评价下的 ${count} 条回复也会一并删除，且无法恢复。确定删除？`
+          : '删除后无法恢复，确定删除这条评价？',
+        confirmText: '删除',
+        confirmColor: '#e74c3c',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await deleteReview(review.id)
+            this.loadReviews()
+            setTimeout(() => uni.showToast({ title: '已删除', icon: 'success' }), 100)
+          } catch (e) {
+            uni.showToast({ title: e.msg || '删除失败', icon: 'none' })
+          }
+        }
+      })
+    },
+    /** 删除本人发的回复 */
+    onDeleteComment(comment) {
+      uni.showModal({
+        title: '删除回复',
+        content: '删除后无法恢复（它下面的追问也会一并删除），确定删除？',
+        confirmText: '删除',
+        confirmColor: '#e74c3c',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await deleteComment(comment.id)
+            this.loadReviews()
+            setTimeout(() => uni.showToast({ title: '已删除', icon: 'success' }), 100)
+          } catch (e) {
+            uni.showToast({ title: e.msg || '删除失败', icon: 'none' })
+          }
+        }
+      })
     },
     async loadDetail() {
       try {
@@ -577,45 +723,136 @@ export default {
   line-height: 1.6;
 }
 
+.review-tag {
+  font-size: 22rpx;
+  color: #909399;
+  background: #f4f4f5;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  margin-left: 12rpx;
+}
+
+.house-banner {
+  background: #fdf6ec;
+  color: #e6a23c;
+  font-size: 24rpx;
+  line-height: 1.5;
+  padding: 18rpx 24rpx;
+  margin: 20rpx 20rpx 0;
+  border-radius: 12rpx;
+}
+
+.review-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8rpx;
+}
+
+.foot-ops {
+  display: flex;
+  align-items: center;
+}
+
+.op-del {
+  color: #e74c3c;
+}
+
 .review-time {
   font-size: 22rpx;
   color: #c0c4cc;
-  margin-top: 8rpx;
+}
+
+.review-like {
+  font-size: 24rpx;
+  color: #c0c4cc;
+  padding: 6rpx 0 6rpx 16rpx;
+}
+
+.review-like.liked {
+  color: #e74c3c;
 }
 
 .comment-list {
   background: #f5f7fa;
   border-radius: 10rpx;
-  padding: 14rpx;
+  padding: 6rpx 14rpx;
   margin-top: 12rpx;
 }
 
 .comment-item {
   font-size: 24rpx;
-  margin-bottom: 10rpx;
+  padding: 10rpx 0;
+  border-bottom: 1rpx solid #eef0f3;
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-body {
   display: flex;
-  align-items: flex-start;
   flex-wrap: wrap;
+  align-items: baseline;
 }
 
 .comment-name {
   color: #1a56db;
 }
 
+.comment-reply-to {
+  color: #909399;
+  font-size: 22rpx;
+  padding: 0 6rpx;
+}
+
 .comment-content {
   color: #606266;
 }
 
+.comment-ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 6rpx;
+}
+
+.comment-op {
+  font-size: 22rpx;
+  color: #909399;
+  padding: 4rpx 0 4rpx 20rpx;
+}
+
 .comment-like {
-  margin-left: auto;
+  font-size: 22rpx;
+  color: #c0c4cc;
+  padding: 4rpx 0 4rpx 20rpx;
+}
+
+.comment-like.liked {
   color: #e74c3c;
-  padding-left: 16rpx;
 }
 
 .reply-btn {
   font-size: 24rpx;
   color: #1a56db;
-  margin-top: 10rpx;
+  margin-top: 12rpx;
+  display: inline-block;
+  padding: 6rpx 0;
+}
+
+.load-more {
+  text-align: center;
+  font-size: 24rpx;
+  color: #1a56db;
+  padding: 22rpx 0 8rpx;
+}
+
+.star-clear {
+  text-align: center;
+  font-size: 24rpx;
+  color: #909399;
+  padding: 4rpx 0 16rpx;
 }
 
 .bottom-bar {
