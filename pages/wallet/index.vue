@@ -56,7 +56,7 @@
 </template>
 
 <script>
-import { getMyWallet, recharge, withdraw, getTransactions } from '@/api/wallet'
+import { getMyWallet, recharge, withdraw, genIdempotencyKey, getTransactions } from '@/api/wallet'
 
 const BIZ_TEXT = {
   RECHARGE: '充值', WITHDRAW: '提现',
@@ -74,6 +74,8 @@ export default {
       showRechargePanel: true,
       withdrawAmount: '',
       showWithdrawPanel: false,
+      /** 幂等键：打开提现面板时生成一次，面板内重试命中同一键 ⇒ 后端只扣一次款 */
+      withdrawIdemKey: '',
       txnList: [],
       page: 1,
       pageSize: 10,
@@ -141,8 +143,11 @@ export default {
       }
     },
     doWithdraw() {
+      const opening = !this.showWithdrawPanel
       this.showWithdrawPanel = !this.showWithdrawPanel
       this.showRechargePanel = false
+      // 每次打开都换新键：同一次"提现意图"内重试被幂等拦下，关掉重开则是新的合法提现
+      if (opening) this.withdrawIdemKey = genIdempotencyKey()
     },
     showRecharge() {
       this.showRechargePanel = !this.showRechargePanel
@@ -163,7 +168,7 @@ export default {
           if (this.submitting) { uni.showToast({ title: '正在处理，请稍候…', icon: 'none' }); return }
           this.submitting = true
           try {
-            const r = await withdraw(amount)
+            const r = await withdraw(amount, this.withdrawIdemKey)
             this.balance = Number((r.data && r.data.balance) || 0)
             this.withdrawAmount = ''
             this.showWithdrawPanel = false

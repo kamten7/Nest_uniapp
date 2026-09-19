@@ -62,6 +62,7 @@
     <view class="action-bar">
       <!-- 待缴押金 -->
       <template v-if="order.status === 1">
+        <view class="hint">请在 30 分钟内缴纳押金，超时订单将自动取消、房源重新上架</view>
         <view class="action-btn primary" @tap="payDeposit">缴纳押金 {{ money(order.deposit) }}元</view>
         <view class="action-btn danger" @tap="onCancelOrder">放弃租房</view>
       </template>
