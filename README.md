@@ -329,7 +329,7 @@ npm run dev:mp-weixin（watch 自动重编译）
 
 `utils/stream.js` 基于 `wx.request` 的分块接收能力实现 SSE 解析，逐段渲染到气泡，支持中途中断请求。该能力依赖微信基础库 >= 2.20.1，低版本会给出明确提示。
 
-> 服务端的 AI 找房是 **LangChain4j 真实 Function Calling Agent**：模型自行决策调用哪些只读工具（搜索房源 / 查详情 / 查附近 / 查评论 / 智能推荐）拉取真实数据，再组织成自然语言流式返回。本端只负责渲染 SSE 流。
+> 服务端的 AI 找房是 **LangChain4j 真实 Function Calling Agent**：模型自行决策调用哪些只读工具（搜索房源 / 查详情 / 查附近 / 智能推荐）拉取真实数据，再组织成自然语言流式返回。本端只负责渲染 SSE 流。
 
 
 ---
