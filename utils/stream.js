@@ -109,6 +109,7 @@ export function streamRequest({ url, data = {}, onMessage, onDone, onError }) {
    */
   function processSSEPart(part) {
     const lines = part.split('\n')
+    const dataLines = []
     for (const line of lines) {
       const trimmed = line.trim()
       if (!trimmed.startsWith('data:')) continue
@@ -131,13 +132,17 @@ export function streamRequest({ url, data = {}, onMessage, onDone, onError }) {
         return
       }
 
-      // 正常内容块：处理转义字符
-      const decoded = content
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t')
-        .replace(/\\\\/g, '\\')
-      onMessage && onMessage(decoded)
+      dataLines.push(content)
     }
+
+    if (!dataLines.length) return
+    // SSE 规范：同一事件内的多行 data: 属于同一条消息，行间以 \n 还原
+    const joined = dataLines.join('\n')
+    const decoded = joined
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\')
+    onMessage && onMessage(decoded)
   }
 
   return requestTask

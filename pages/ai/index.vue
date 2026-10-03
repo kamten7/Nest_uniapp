@@ -228,12 +228,21 @@ export default {
     appendAI(chunk) {
       const last = this.messages[this.messages.length - 1]
       if (last && last.role === 'ai') {
-        last.content += chunk
+        last.content = this.stripMarkdown(last.content + chunk)
       } else {
-        this.messages.push({ role: 'ai', content: chunk })
+        this.messages.push({ role: 'ai', content: this.stripMarkdown(chunk) })
       }
       // 逐字输出时消息条数不变、但内容一直在变高，所以必须每次都重新定位到底部锚点
       this.scrollToBottom()
+    },
+    /** 模型偶尔仍会输出 Markdown 标记，聊天气泡是纯文本，直接剥掉 */
+    stripMarkdown(text) {
+      return text
+        .replace(/\*\*/g, '')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^\s*[-*]\s+/gm, '')
+        // 编号列表前强制换行（"霞山区2.湛江金纺" → 编号前断行）；点后跟数字的（如 2.5）不误伤
+        .replace(/([^\n\d.])\s*(\d+\.(?!\d))/g, '$1\n$2')
     },
     /** 流式结束（errorMsg 为空表示正常结束） */
     finishAI(errorMsg) {
@@ -400,6 +409,7 @@ export default {
   font-size: 28rpx;
   line-height: 1.5;
   word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .bubble.ai {
