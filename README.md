@@ -1,7 +1,7 @@
 <h1 align="center">🏠 Nest 安居 · 租客端微信小程序</h1>
 
 <p align="center">
-  <strong>多房东 AI 租房平台 · 租客端 · 地图找房 + AI 流式找房 + Netty 实时聊天 + 在线签约缴费</strong>
+  <strong>多房东 AI 租房平台 · 租客端 · 地图找房 + AI 流式找房 + Netty 实时聊天 + 在线缴费退租</strong>
 </p>
 
 <p align="center">
@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white" alt="Vite">
   <img src="https://img.shields.io/badge/Pinia-2-FFD859?logo=pinia&logoColor=black" alt="Pinia">
   <img src="https://img.shields.io/badge/WeChat-小程序-07C160?logo=wechat&logoColor=white" alt="WeChat MiniProgram">
+  <img src="https://github.com/kamten7/Nest_uniapp/actions/workflows/miniapp-ci.yml/badge.svg" alt="Miniapp CI">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
 </p>
 
@@ -28,9 +29,9 @@
 
 ## 📖 项目介绍
 
-**Nest（安居）** 是一套**多房东 AI 租房平台**，覆盖**租客微信小程序**与**房东 Web 管理端**双端。本仓库是其中的**租客端小程序**：租客在这里找房、咨询房东、预约看房、在线签约、缴纳押金与租金、申请退租，并使用 AI 助手用自然语言找房。
+**Nest（安居）** 是一套**多房东 AI 租房平台**，覆盖**租客微信小程序**与**房东 Web 管理端**双端。本仓库是其中的**租客端小程序**：租客在这里找房、咨询房东、预约看房、缴纳押金与租金、申请退租，并使用 AI 助手用自然语言找房。
 
-覆盖「找房 → 咨询 → 预约 → 签约 → 缴费 → 退租」的完整租房链路。前端不直连数据库，全部通过后端 REST 接口与 WebSocket 长连接交互。
+覆盖「找房 → 咨询 → 预约 → 看房 → 缴费 → 退租」的完整租房链路。前端不直连数据库，全部通过后端 REST 接口与 WebSocket 长连接交互。
 
 项目由三个**相互独立的 Git 仓库**组成，各自独立开发、独立提交：
 
@@ -234,21 +235,23 @@ npm run build:mp-weixin     # 产物输出到 dist/build/mp-weixin/
 
 ## ⚙️ 配置信息
 
-### 5.1 环境地址（`utils/env.js`）
+### 5.1 环境地址（`.env` / `utils/env.js`）
 
-HTTP 接口与 WebSocket 长连接由后端的不同服务提供，**端口不同，必须分别配置**：
+HTTP 接口与 WebSocket 长连接由后端的不同服务提供，**端口不同，必须分别配置**。
+`utils/env.js` 读取 Vite 注入的 `import.meta.env`，推荐复制 `.env.example` 为 `.env` 覆盖，而不是改源码：
 
-| 导出项 | 说明 |
-|--------|------|
-| `baseUrl` | HTTP 接口地址，默认 `http://localhost:8080` |
-| `wsBaseUrl` | WebSocket 地址，默认 `ws://localhost:8081` |
+```bash
+cp .env.example .env
+```
 
-> `wsBaseUrl` 不能由 `baseUrl` 推导得出，两者协议与端口均不同。
-> 真机调试时两行都要改为开发机的局域网 IP，例如：
-> ```js
-> export const baseUrl = 'http://192.168.x.x:8080'
-> export const wsBaseUrl = 'ws://192.168.x.x:8081'
-> ```
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `VITE_API_BASE_URL` | `http://localhost:8080` | HTTP 接口（Spring Boot） |
+| `VITE_WS_BASE_URL` | `ws://localhost:8081` | WebSocket 长连接（Netty） |
+
+> `VITE_WS_BASE_URL` 不能由 `VITE_API_BASE_URL` 推导得出，两者协议与端口均不同。
+> 真机调试：改成开发机局域网 IP（如 `http://192.168.x.x:8080`），并确保防火墙放通对应端口。
+> 生产：必须在微信公众平台配置 request/socket 合法域名（https/wss）。
 
 ### 5.2 小程序配置
 
@@ -342,7 +345,8 @@ npm run dev:mp-weixin（watch 自动重编译）
 | 提示「不在以下 request 合法域名列表中」 | 开发者工具未勾选「不校验合法域名」。注意 `project.private.config.json` 中 `urlCheck` 为 `true` 时会开启校验，且该文件每次编译会由源码复制覆盖，建议直接将源码中的该项改为 `false` |
 | 接口正常但聊天无响应 | 确认 `wsBaseUrl` 指向长连接服务的正确端口，且该服务已启动、端口未被占用 |
 | 长连接频繁断开 | 检查客户端心跳间隔是否小于服务端空闲超时时间；网络切换后由重连机制恢复 |
-| 白屏或找不到 `app.json` | 微信开发者工具导入的目录应为编译产物 `dist/dev/mp-weixin`，而非仓库根目录 |
+| 白屏或找不到 `app.json` | 微信开发者工具导入的目录应为编译产物 `dist/dev/mp-weixin` 或 `dist/build/mp-weixin`，而非仓库根目录 |
+| 编译后白屏，Console 报 `module 'url.js' is not defined` | `utils/env.js` 必须直接写 `import.meta.env`，不能写 `(import.meta && import.meta.env)`；后者会让 Vite 生成 Node 的 `require("url")` shim，小程序无法加载 |
 | 登录后立即跳回登录页 | 登录态已失效或后端服务不可用，检查后端及其依赖服务状态 |
 
 

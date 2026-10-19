@@ -1,8 +1,8 @@
 <template>
   <view class="my-page">
-    <!-- 全局消息弹窗 -->
+
     <message-toast />
-    <!-- 已登录：用户信息卡 + 菜单 -->
+
     <template v-if="userStore.isLogin">
       <view class="user-card" @tap="go('/pages/profile/index')">
         <image v-if="userStore.userInfo.avatar" class="avatar avatar-img" :src="userStore.userInfo.avatar" mode="aspectFill" />
@@ -45,7 +45,6 @@
       <view class="logout-btn" @tap="logout">退出登录</view>
     </template>
 
-    <!-- 未登录：登录/注册表单 -->
     <template v-else>
       <view class="login-card">
         <view class="login-logo">🏠</view>
@@ -79,11 +78,7 @@ export default {
     }
   },
   methods: {
-    /**
-     * 微信一键登录：wx.login() 静默拿一次性 code → 后端调 jscode2session 换 openid
-     * → 已注册直接登录，未注册自动注册 → 返回 JWT。
-     * code 一次性，失败后需重新调 uni.login() 取新 code（这里每次点击都重新取，天然满足）。
-     */
+
     doWxLogin() {
       uni.login({
         provider: 'weixin',
@@ -99,7 +94,7 @@ export default {
         }
       })
     },
-    /** 用 code 调后端登录（后端负责换 openid / 自动注册 / 签发 JWT） */
+
     async loginWithCode(code) {
       uni.showLoading({ title: '登录中...' })
       try {
@@ -111,7 +106,7 @@ export default {
         uni.showToast({ title: '登录成功', icon: 'success' })
       } catch (e) {
         uni.hideLoading()
-        // 后端对 code 失效等场景返回的可读提示（如"登录已过期，请重新登录"）
+
         uni.showToast({ title: e.msg || '登录失败', icon: 'none' })
       }
     },
@@ -121,17 +116,19 @@ export default {
         content: '确定退出登录吗？',
         success: (res) => {
           if (res.confirm) {
-            this.userStore.logout()
-            // 退出登录 → 关闭长连接 + 清角标
-            closeChat()
-            syncMessageBadge()
-            uni.showToast({ title: '已退出', icon: 'none' })
+            post('/user/auth/logout').catch(() => {}).finally(() => {
+              this.userStore.logout()
+
+              closeChat()
+              syncMessageBadge()
+              uni.showToast({ title: '已退出', icon: 'none' })
+            })
           }
         }
       })
     },
     go(url) {
-      // 消息是 TabBar 页：微信 navigateTo 不能跳 tabBar 页面，需用 switchTab
+
       if (url === '/pages/chat/index') {
         uni.switchTab({ url })
         return
@@ -147,7 +144,6 @@ export default {
   min-height: 100vh;
 }
 
-/* ===== 已登录 ===== */
 .user-card {
   display: flex;
   align-items: center;
@@ -183,13 +179,11 @@ export default {
   margin-top: 8rpx;
 }
 
-/* 未绑定手机号：高亮提示（绑定后才能确认租房） */
 .phone.hint {
   opacity: 1;
   color: #ffe9b8;
 }
 
-/* 真实头像图片：复用 .avatar 的尺寸与圆形 */
 .avatar-img {
   background: rgba(255, 255, 255, 0.3);
 }
@@ -234,7 +228,6 @@ export default {
   font-size: 28rpx;
 }
 
-/* ===== 未登录 ===== */
 .login-card {
   margin: 100rpx 40rpx;
   background: #fff;
