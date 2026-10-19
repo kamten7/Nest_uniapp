@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4060620250520001",
-    "@dcloudio/uni-app-plus": "3.0.0-4060620250520001",
+    "@dcloudio/uni-app-plus": "3.0.0-5020620260917001",
     "@dcloudio/uni-components": "3.0.0-4060620250520001",
     "@dcloudio/uni-h5": "3.0.0-4060620250520001",
     "@dcloudio/uni-mp-weixin": "3.0.0-4060620250520001",
